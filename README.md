@@ -3,15 +3,19 @@
 A lightweight, native macOS Markdown viewer for people who live in `.md` files.
 Think "Obsidian minus the graph, plugins, and weight."
 
-Point it at a folder and it indexes every `.md` / `.markdown` file, renders them as
-GitHub-flavored Markdown, searches their full text, and updates live as files change on
-disk — for example while an AI agent is editing your `CLAUDE.md` and design docs.
+Point it at one or more folders and it indexes every `.md` / `.markdown` file, renders
+them as GitHub-flavored Markdown, searches their full text, and updates live as files
+change on disk — for example while an AI agent is editing your `CLAUDE.md` and design
+docs.
 
 ## Features
 
 - **Reader** — GFM rendering (headings, lists, task lists, tables, block quotes, code
   blocks) built on [swift-markdown], with Swift syntax highlighting via [Splash]
-- **File tree** — sidebar nested by directory, hidden files excluded
+- **Multiple folders** — add any number of folders (⌘O, multi-select, or drag and drop);
+  each appears as its own sidebar section, and search, quick open, and wikilinks span
+  all of them; remove one via its section header's context menu
+- **File tree** — sidebar nested by directory per folder, hidden files excluded
 - **Full-text search** — SQLite FTS5 with prefix matching and ranked snippet results
 - **Live updates** — FSEvents watcher rescans the folder and re-renders the open file
   when anything changes
@@ -40,7 +44,7 @@ Or from the command line: `swift run`.
 
 | Shortcut | Action |
 | --- | --- |
-| ⌘O | Open folder |
+| ⌘O | Add folder(s) |
 | ⌘P | Quick open file |
 | ⌥⌘↑ / ⌥⌘↓ | Previous / next file |
 | ↑ / ↓ | Move through the sidebar, or move the block cursor in the reader |

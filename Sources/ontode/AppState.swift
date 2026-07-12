@@ -3,9 +3,8 @@ import SwiftUI
 
 @MainActor
 final class AppState: ObservableObject {
-    @Published var folderURL: URL?
+    @Published var workspaceFolders: [WorkspaceFolder] = []
     @Published var mdFiles: [URL] = []
-    @Published var fileTree: [FileNode] = []
     @Published var selectedFile: URL?
     @Published var fileContent: String = ""
     @Published var blocks: [MDBlock] = []
@@ -25,12 +24,16 @@ final class AppState: ObservableObject {
     private static let themeKey = "ontode.theme"
 
     private let searchIndex: SearchIndex = FTS5SearchIndex()
-    private var watcher: FolderWatcher?
+    private var watchers: [URL: FolderWatcher] = [:]
     private var editingLineRange: ClosedRange<Int>?
 
     init() {
         let stored = UserDefaults.standard.string(forKey: Self.themeKey)
         theme = stored.flatMap(AppTheme.init(rawValue:)) ?? .solarizedDark
+    }
+
+    var hasFolders: Bool {
+        !workspaceFolders.isEmpty
     }
 
     func toggleTheme() {
@@ -41,32 +44,53 @@ final class AppState: ObservableObject {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
+        panel.allowsMultipleSelection = true
         panel.canCreateDirectories = false
+        panel.prompt = "Add"
 
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        openFolder(url)
+        guard panel.runModal() == .OK else { return }
+        for url in panel.urls {
+            addFolder(url)
+        }
     }
 
-    func openFolder(_ url: URL) {
+    func addFolder(_ url: URL) {
+        guard folderRoot(for: url) == nil else { return }
+        guard !workspaceFolders.contains(where: { $0.url.path.hasPrefix(url.path + "/") }) else { return }
         commitEditing()
-        folderURL = url
-        selectedFile = nil
-        fileContent = ""
-        blocks = []
-        focusedBlockID = nil
-        searchQuery = ""
-        rescan()
+        workspaceFolders.append(WorkspaceFolder(url: url))
 
-        watcher?.stop()
-        watcher = FolderWatcher(url: url) { [weak self] in
+        let watcher = FolderWatcher(url: url) { [weak self] in
             self?.folderDidChange()
         }
-        watcher?.start()
+        watchers[url] = watcher
+        watcher.start()
 
-        if let first = mdFiles.first {
+        rescan()
+        if selectedFile == nil, let first = mdFiles.first {
             selectFile(first)
         }
+    }
+
+    func removeFolder(_ url: URL) {
+        commitEditing()
+        watchers[url]?.stop()
+        watchers[url] = nil
+        workspaceFolders.removeAll { $0.url == url }
+        rescan()
+        if let selectedFile, !mdFiles.contains(selectedFile) {
+            self.selectedFile = nil
+            focusedBlockID = nil
+            fileContent = ""
+            blocks = []
+        }
+    }
+
+    func folderRoot(for url: URL) -> URL? {
+        workspaceFolders
+            .map(\.url)
+            .filter { url.path == $0.path || url.path.hasPrefix($0.path + "/") }
+            .max { $0.path.count < $1.path.count }
     }
 
     func selectFile(_ url: URL) {
@@ -77,8 +101,14 @@ final class AppState: ObservableObject {
     }
 
     func relativePath(for url: URL) -> String {
-        guard let base = folderURL else { return url.lastPathComponent }
+        guard let base = folderRoot(for: url) else { return url.lastPathComponent }
         return String(url.path.dropFirst(base.path.count + 1))
+    }
+
+    func displayPath(for url: URL) -> String {
+        guard let base = folderRoot(for: url) else { return url.lastPathComponent }
+        let relative = String(url.path.dropFirst(base.path.count + 1))
+        return workspaceFolders.count > 1 ? base.lastPathComponent + "/" + relative : relative
     }
 
     func openWikilink(_ target: String) {
@@ -184,10 +214,8 @@ final class AppState: ObservableObject {
                 return range.contains(editedLine) || range.lowerBound >= editedLine
             }?.id
         }
-        if let folderURL {
-            searchIndex.reindex(folder: folderURL, files: mdFiles)
-            runSearch()
-        }
+        reindexSearch()
+        runSearch()
     }
 
     func quickOpenMatches(for query: String) -> [URL] {
@@ -195,7 +223,7 @@ final class AppState: ObservableObject {
         guard !needle.isEmpty else { return mdFiles }
         return mdFiles
             .compactMap { url -> (URL, Int)? in
-                guard let score = Self.fuzzyScore(needle, in: relativePath(for: url).lowercased()) else {
+                guard let score = Self.fuzzyScore(needle, in: displayPath(for: url).lowercased()) else {
                     return nil
                 }
                 return (url, score)
@@ -205,14 +233,23 @@ final class AppState: ObservableObject {
     }
 
     private func rescan() {
-        guard let folderURL else { return }
-        mdFiles = FolderScanner.scan(folder: folderURL)
-        fileTree = FileNode.tree(for: mdFiles, in: folderURL)
-        searchIndex.reindex(folder: folderURL, files: mdFiles)
+        for index in workspaceFolders.indices {
+            let root = workspaceFolders[index].url
+            let files = FolderScanner.scan(folder: root)
+            workspaceFolders[index].files = files
+            workspaceFolders[index].tree = FileNode.tree(for: files, in: root)
+        }
+        mdFiles = workspaceFolders.flatMap(\.files)
+        reindexSearch()
+        runSearch()
+    }
+
+    private func reindexSearch() {
+        searchIndex.reindex(mdFiles.map { SearchEntry(url: $0, displayPath: displayPath(for: $0)) })
     }
 
     private func folderDidChange() {
-        guard folderURL != nil else { return }
+        guard hasFolders else { return }
         rescan()
         if let selectedFile {
             if mdFiles.contains(selectedFile) {
@@ -228,7 +265,6 @@ final class AppState: ObservableObject {
                 blocks = []
             }
         }
-        runSearch()
     }
 
     private func loadContent(from url: URL) {

@@ -1,16 +1,21 @@
 import Foundation
 import SQLite3
 
+struct SearchEntry {
+    let url: URL
+    let displayPath: String
+}
+
 struct SearchResult: Identifiable {
     let url: URL
-    let relativePath: String
+    let displayPath: String
     let snippet: AttributedString
 
     var id: URL { url }
 }
 
 protocol SearchIndex {
-    func reindex(folder: URL, files: [URL])
+    func reindex(_ entries: [SearchEntry])
     func search(_ query: String) -> [SearchResult]
 }
 
@@ -29,7 +34,7 @@ final class FTS5SearchIndex: SearchIndex {
         sqlite3_close(db)
     }
 
-    func reindex(folder: URL, files: [URL]) {
+    func reindex(_ entries: [SearchEntry]) {
         guard db != nil else { return }
         exec("DELETE FROM docs")
         exec("BEGIN")
@@ -38,11 +43,10 @@ final class FTS5SearchIndex: SearchIndex {
             exec("COMMIT")
             return
         }
-        for file in files {
-            guard let body = try? String(contentsOf: file, encoding: .utf8) else { continue }
-            let name = String(file.path.dropFirst(folder.path.count + 1))
-            sqlite3_bind_text(statement, 1, file.path, -1, transient)
-            sqlite3_bind_text(statement, 2, name, -1, transient)
+        for entry in entries {
+            guard let body = try? String(contentsOf: entry.url, encoding: .utf8) else { continue }
+            sqlite3_bind_text(statement, 1, entry.url.path, -1, transient)
+            sqlite3_bind_text(statement, 2, entry.displayPath, -1, transient)
             sqlite3_bind_text(statement, 3, body, -1, transient)
             sqlite3_step(statement)
             sqlite3_reset(statement)
@@ -75,7 +79,7 @@ final class FTS5SearchIndex: SearchIndex {
                   let snippet = sqlite3_column_text(statement, 2) else { continue }
             results.append(SearchResult(
                 url: URL(fileURLWithPath: String(cString: path)),
-                relativePath: String(cString: name),
+                displayPath: String(cString: name),
                 snippet: Self.attributedSnippet(String(cString: snippet))
             ))
         }

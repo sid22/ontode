@@ -16,7 +16,7 @@ struct OntodeApp: App {
         }
         .commands {
             CommandGroup(replacing: .newItem) {
-                Button("Open Folder…") {
+                Button("Add Folder…") {
                     appState.openFolderPicker()
                 }
                 .keyboardShortcut("o", modifiers: .command)
@@ -26,7 +26,7 @@ struct OntodeApp: App {
                     appState.quickOpenPresented = true
                 }
                 .keyboardShortcut("p", modifiers: .command)
-                .disabled(appState.folderURL == nil)
+                .disabled(!appState.hasFolders)
             }
             CommandGroup(after: .textEditing) {
                 Divider()

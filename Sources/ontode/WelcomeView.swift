@@ -24,28 +24,30 @@ struct WelcomeView: View {
                     .foregroundStyle(.white)
             }
             VStack(spacing: 6) {
-                Text("No Folder Open")
+                Text("No Folders Open")
                     .font(.title2.weight(.semibold))
-                Text("Browse, search, and edit the Markdown files in a folder.")
+                Text("Browse, search, and edit the Markdown files in one or more folders.")
                     .foregroundStyle(.secondary)
             }
-            Button("Open Folder…") {
+            Button("Add Folder…") {
                 appState.openFolderPicker()
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
-            Text("or drop a folder here — ⌘O")
+            Text("or drop folders here — ⌘O")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(appState.theme.canvas)
         .dropDestination(for: URL.self) { urls, _ in
-            guard let url = urls.first,
-                  (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true else {
-                return false
+            let directories = urls.filter {
+                (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
             }
-            appState.openFolder(url)
+            guard !directories.isEmpty else { return false }
+            for directory in directories {
+                appState.addFolder(directory)
+            }
             return true
         }
     }

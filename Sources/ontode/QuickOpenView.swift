@@ -74,7 +74,7 @@ struct QuickOpenView: View {
         HStack(spacing: 8) {
             Image(systemName: "doc.text")
                 .foregroundStyle(highlighted ? .white : .secondary)
-            Text(appState.relativePath(for: url))
+            Text(appState.displayPath(for: url))
                 .lineLimit(1)
                 .truncationMode(.middle)
             Spacer(minLength: 0)

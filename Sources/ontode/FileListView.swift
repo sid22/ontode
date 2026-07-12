@@ -27,30 +27,45 @@ struct FileListView: View {
             }
         }
         .searchable(text: $appState.searchQuery, placement: .sidebar, prompt: "Search")
-        .navigationTitle(appState.folderURL?.lastPathComponent ?? "")
+        .navigationTitle(title)
         .navigationSubtitle(subtitle)
         .toolbar {
             ToolbarItem {
                 Button(action: { appState.openFolderPicker() }) {
-                    Label("Open Folder", systemImage: "folder")
+                    Label("Add Folder", systemImage: "folder.badge.plus")
                 }
-                .help("Open another folder (⌘O)")
+                .help("Add a folder (⌘O)")
             }
         }
     }
 
     private var treeList: some View {
         List(selection: selection) {
-            OutlineGroup(appState.fileTree, children: \.children) { node in
-                Label(node.name, systemImage: node.children == nil ? "doc.text" : "folder.fill")
-                    .help(node.url.path)
-                    .tag(node.url)
-                    .selectionDisabled(node.children != nil)
-                    .contextMenu {
-                        Button("Reveal in Finder") {
-                            NSWorkspace.shared.activateFileViewerSelecting([node.url])
-                        }
+            ForEach(appState.workspaceFolders) { folder in
+                Section {
+                    OutlineGroup(folder.tree, children: \.children) { node in
+                        Label(node.name, systemImage: node.children == nil ? "doc.text" : "folder.fill")
+                            .help(node.url.path)
+                            .tag(node.url)
+                            .selectionDisabled(node.children != nil)
+                            .contextMenu {
+                                Button("Reveal in Finder") {
+                                    NSWorkspace.shared.activateFileViewerSelecting([node.url])
+                                }
+                            }
                     }
+                } header: {
+                    Text(folder.url.lastPathComponent)
+                        .contextMenu {
+                            Button("Reveal in Finder") {
+                                NSWorkspace.shared.activateFileViewerSelecting([folder.url])
+                            }
+                            Divider()
+                            Button("Remove from Sidebar") {
+                                appState.removeFolder(folder.url)
+                            }
+                        }
+                }
             }
         }
         .listStyle(.sidebar)
@@ -59,7 +74,7 @@ struct FileListView: View {
     private var resultsList: some View {
         List(appState.searchResults, selection: selection) { result in
             VStack(alignment: .leading, spacing: 3) {
-                Label(result.relativePath, systemImage: "doc.text")
+                Label(result.displayPath, systemImage: "doc.text")
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Text(result.snippet)
@@ -71,6 +86,14 @@ struct FileListView: View {
             .tag(result.url)
         }
         .listStyle(.sidebar)
+    }
+
+    private var title: String {
+        switch appState.workspaceFolders.count {
+        case 0: return ""
+        case 1: return appState.workspaceFolders[0].url.lastPathComponent
+        default: return "\(appState.workspaceFolders.count) Folders"
+        }
     }
 
     private var subtitle: String {

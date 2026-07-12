@@ -5,7 +5,7 @@ struct ContentView: View {
 
     var body: some View {
         Group {
-            if appState.folderURL == nil {
+            if !appState.hasFolders {
                 WelcomeView()
             } else {
                 NavigationSplitView {

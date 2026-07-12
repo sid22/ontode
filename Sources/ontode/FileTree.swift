@@ -1,5 +1,13 @@
 import Foundation
 
+struct WorkspaceFolder: Identifiable {
+    let url: URL
+    var files: [URL] = []
+    var tree: [FileNode] = []
+
+    var id: URL { url }
+}
+
 struct FileNode: Identifiable {
     let url: URL
     let name: String
