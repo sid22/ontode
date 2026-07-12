@@ -1,0 +1,58 @@
+name: Build DMG
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build universal release binary
+        run: swift build -c release --arch arm64 --arch x86_64
+
+      - name: Assemble ontode.app
+        run: |
+          BIN_PATH=$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)
+          APP=build/ontode.app
+          mkdir -p "$APP/Contents/MacOS"
+          cp "$BIN_PATH/ontode" "$APP/Contents/MacOS/ontode"
+          cat > "$APP/Contents/Info.plist" <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleExecutable</key>
+              <string>ontode</string>
+              <key>CFBundleIdentifier</key>
+              <string>dev.sid22.ontode</string>
+              <key>CFBundleName</key>
+              <string>ontode</string>
+              <key>CFBundlePackageType</key>
+              <string>APPL</string>
+              <key>CFBundleShortVersionString</key>
+              <string>0.1.0</string>
+              <key>CFBundleVersion</key>
+              <string>1</string>
+              <key>LSMinimumSystemVersion</key>
+              <string>14.0</string>
+              <key>NSHighResolutionCapable</key>
+              <true/>
+          </dict>
+          </plist>
+          PLIST
+          codesign --force --deep --sign - "$APP"
+
+      - name: Create DMG
+        run: |
+          mkdir -p build/dmg
+          cp -R build/ontode.app build/dmg/
+          ln -s /Applications build/dmg/Applications
+          hdiutil create -volname ontode -srcfolder build/dmg -ov -format UDZO build/ontode.dmg
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ontode-dmg
+          path: build/ontode.dmg
