@@ -10,13 +10,13 @@ enum AppTheme: String, CaseIterable {
         self == .solarizedDark ? .dark : .light
     }
 
-    var canvas: Color { Color(nsColor: nsCanvas) }
-    var raised: Color { Color(nsColor: nsRaised) }
-    var text: Color { Color(nsColor: nsText) }
-    var emphasis: Color { Color(nsColor: nsEmphasis) }
-    var secondary: Color { Color(nsColor: nsSecondary) }
-    var accent: Color { Color(nsColor: Solarized.blue) }
-    var border: Color { secondary.opacity(0.35) }
+    var canvas: SwiftUI.Color { SwiftUI.Color(nsColor: nsCanvas) }
+    var raised: SwiftUI.Color { SwiftUI.Color(nsColor: nsRaised) }
+    var text: SwiftUI.Color { SwiftUI.Color(nsColor: nsText) }
+    var emphasis: SwiftUI.Color { SwiftUI.Color(nsColor: nsEmphasis) }
+    var secondary: SwiftUI.Color { SwiftUI.Color(nsColor: nsSecondary) }
+    var accent: SwiftUI.Color { SwiftUI.Color(nsColor: Solarized.blue) }
+    var border: SwiftUI.Color { secondary.opacity(0.35) }
 
     var splashTheme: Splash.Theme {
         Splash.Theme(

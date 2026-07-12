@@ -67,7 +67,7 @@ struct EditableBlockView: View {
         }
     }
 
-    private var backgroundColor: Color {
+    private var backgroundColor: SwiftUI.Color {
         if appState.focusedBlockID == block.id {
             return theme.accent.opacity(0.10)
         }
@@ -304,7 +304,7 @@ struct CodeBlockView: View {
             var piece = AttributedString(source.attributedSubstring(from: range).string)
             piece.font = .system(size: 12.5, design: .monospaced)
             if let color = attributes[.foregroundColor] as? NSColor {
-                piece.foregroundColor = Color(nsColor: color)
+                piece.foregroundColor = SwiftUI.Color(nsColor: color)
             }
             result += piece
         }

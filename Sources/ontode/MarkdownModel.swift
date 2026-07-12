@@ -53,8 +53,10 @@ enum MarkdownBuilder {
         case let list as OrderedList:
             return MDBlock(kind: .orderedList(list.listItems.map(item(from:)), Int(list.startIndex)), lineRange: lineRange)
         case let table as Markdown.Table:
-            let head = table.head.cells.map { inline($0.children) }
-            let rows = table.body.rows.map { row in row.cells.map { inline($0.children) } }
+            let head: [AttributedString] = table.head.cells.map { inline($0.children) }
+            let rows: [[AttributedString]] = table.body.rows.map { row in
+                row.cells.map { inline($0.children) }
+            }
             return MDBlock(kind: .table(head, rows), lineRange: lineRange)
         case is ThematicBreak:
             return MDBlock(kind: .rule, lineRange: lineRange)
