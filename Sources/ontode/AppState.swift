@@ -33,6 +33,7 @@ final class AppState: ObservableObject {
     private var editingLineRange: ClosedRange<Int>?
     private var scanGeneration = 0
     private var scanTask: Task<Void, Never>?
+    private var debounceTask: Task<Void, Never>?
 
     init() {
         let stored = UserDefaults.standard.string(forKey: Self.themeKey) ?? ""
@@ -157,6 +158,17 @@ final class AppState: ObservableObject {
         }
         let url = root.appendingPathComponent(name)
         guard FileManager.default.createFile(atPath: url.path, contents: Data()) else { return }
+
+        // Optimistic UI update
+        for index in workspaceFolders.indices {
+            if workspaceFolders[index].url == root || url.path.hasPrefix(workspaceFolders[index].url.path + "/") {
+                workspaceFolders[index].files.append(url)
+                workspaceFolders[index].files.sort { $0.path < $1.path }
+                workspaceFolders[index].tree = FileNode.tree(for: workspaceFolders[index].files, in: workspaceFolders[index].url)
+            }
+        }
+        mdFiles = workspaceFolders.flatMap(\.files)
+
         rescan()
         selectFile(url)
         showSource = false
@@ -170,6 +182,16 @@ final class AppState: ObservableObject {
         } catch {
             return
         }
+
+        // Optimistic UI update
+        for index in workspaceFolders.indices {
+            if workspaceFolders[index].files.contains(url) {
+                workspaceFolders[index].files.removeAll { $0 == url }
+                workspaceFolders[index].tree = FileNode.tree(for: workspaceFolders[index].files, in: workspaceFolders[index].url)
+            }
+        }
+        mdFiles = workspaceFolders.flatMap(\.files)
+
         if openTabs.contains(url) {
             closeTab(url)
         }
@@ -405,6 +427,7 @@ final class AppState: ObservableObject {
             guard let index = workspaceFolders.firstIndex(where: { $0.url == entry.root }) else { continue }
             workspaceFolders[index].files = entry.files
             workspaceFolders[index].tree = entry.tree
+            workspaceFolders[index].isScanning = false
         }
         mdFiles = workspaceFolders.flatMap(\.files)
 
@@ -433,7 +456,15 @@ final class AppState: ObservableObject {
 
     private func folderDidChange() {
         guard hasFolders else { return }
-        rescan()
+        debounceTask?.cancel()
+        debounceTask = Task { @MainActor in
+            do {
+                try await Task.sleep(nanoseconds: 100_000_000) // 100ms
+            } catch {
+                return
+            }
+            rescan()
+        }
     }
 
     private func loadContent(from url: URL) {

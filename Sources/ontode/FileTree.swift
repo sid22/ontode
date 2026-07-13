@@ -4,6 +4,7 @@ struct WorkspaceFolder: Identifiable {
     let url: URL
     var files: [URL] = []
     var tree: [FileNode] = []
+    var isScanning: Bool = true
 
     var id: URL { url }
 }

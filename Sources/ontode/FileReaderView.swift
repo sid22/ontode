@@ -37,10 +37,17 @@ struct FileReaderView: View {
         .navigationTitle(file.lastPathComponent)
         .overlay(alignment: .bottomTrailing) { wordCountBadge }
         .environment(\.openURL, OpenURLAction { url in
-            guard url.scheme == "ontode-wiki" else { return .systemAction }
-            let raw = String(url.absoluteString.dropFirst("ontode-wiki:".count))
-            appState.openWikilink(raw.removingPercentEncoding ?? raw)
-            return .handled
+            if url.scheme == "ontode-wiki" {
+                let raw = String(url.absoluteString.dropFirst("ontode-wiki:".count))
+                appState.openWikilink(raw.removingPercentEncoding ?? raw)
+                return .handled
+            }
+            if url.pathExtension.lowercased() == "md" || url.pathExtension.lowercased() == "markdown" {
+                let target = (url.scheme == nil || url.scheme == "file") ? url.path : url.lastPathComponent
+                appState.openWikilink(target.removingPercentEncoding ?? target)
+                return .handled
+            }
+            return .systemAction
         })
     }
 

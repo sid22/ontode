@@ -94,9 +94,14 @@ struct FileListView: View {
                     HStack {
                         Text(folder.url.lastPathComponent)
                         Spacer()
-                        Text("\(folder.files.count)")
-                            .font(.caption2.weight(.medium))
-                            .foregroundStyle(.secondary)
+                        if folder.isScanning {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Text("\(folder.files.count)")
+                                .font(.caption2.weight(.medium))
+                                .foregroundStyle(.secondary)
+                        }
                     }
                     .contextMenu {
                         Button("New File in \(folder.url.lastPathComponent)") {
