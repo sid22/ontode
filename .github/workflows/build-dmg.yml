@@ -7,7 +7,7 @@ jobs:
   build:
     runs-on: macos-14
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Build universal release binary
         run: swift build -c release --arch arm64 --arch x86_64
@@ -68,7 +68,7 @@ jobs:
           hdiutil create -volname ontode -srcfolder build/dmg -ov -format UDZO build/ontode.dmg
 
       - name: Upload DMG artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ontode-dmg
           path: build/ontode.dmg
