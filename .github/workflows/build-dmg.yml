@@ -16,8 +16,12 @@ jobs:
         run: |
           BIN_PATH=$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)
           APP=build/ontode.app
-          mkdir -p "$APP/Contents/MacOS"
+          mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
           cp "$BIN_PATH/ontode" "$APP/Contents/MacOS/ontode"
+          cp Sources/ontode/Resources/AppIcon.png "$APP/Contents/Resources/AppIcon.png"
+          for bundle in "$BIN_PATH"/*.bundle; do
+            [ -e "$bundle" ] && cp -R "$bundle" "$APP/Contents/Resources/"
+          done
           cat > "$APP/Contents/Info.plist" <<'PLIST'
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

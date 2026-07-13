@@ -6,11 +6,28 @@ enum AppIcon {
     }
 
     private static var image: NSImage {
-        if let url = Bundle.module.url(forResource: "AppIcon", withExtension: "png"),
-           let icon = NSImage(contentsOf: url) {
+        if let url = iconURL, let icon = NSImage(contentsOf: url) {
             return icon
         }
         return fallbackImage
+    }
+
+    private static var iconURL: URL? {
+        if let url = Bundle.main.url(forResource: "AppIcon", withExtension: "png") {
+            return url
+        }
+        let bundleName = "ontode_ontode.bundle"
+        let candidates = [
+            Bundle.main.resourceURL?.appendingPathComponent(bundleName),
+            Bundle.main.bundleURL.appendingPathComponent(bundleName),
+        ]
+        for case let candidate? in candidates {
+            if let bundle = Bundle(url: candidate),
+               let url = bundle.url(forResource: "AppIcon", withExtension: "png") {
+                return url
+            }
+        }
+        return nil
     }
 
     private static var fallbackImage: NSImage {
