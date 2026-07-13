@@ -3,6 +3,7 @@ import SwiftUI
 
 struct FileListView: View {
     @EnvironmentObject var appState: AppState
+    @Environment(\.appTheme) private var theme
 
     private var selection: Binding<URL?> {
         Binding(
@@ -49,26 +50,57 @@ struct FileListView: View {
                             .tag(node.url)
                             .selectionDisabled(node.children != nil)
                             .contextMenu {
-                                Button("Reveal in Finder") {
-                                    NSWorkspace.shared.activateFileViewerSelecting([node.url])
+                                if node.children == nil {
+                                    Button("Open in Default Editor") {
+                                        NSWorkspace.shared.open(node.url)
+                                    }
+                                    Button("Reveal in Finder") {
+                                        NSWorkspace.shared.activateFileViewerSelecting([node.url])
+                                    }
+                                    Divider()
+                                    Button("Copy Path") {
+                                        copy(node.url.path)
+                                    }
+                                    Button("Copy Wikilink") {
+                                        copy("[[" + node.url.deletingPathExtension().lastPathComponent + "]]")
+                                    }
+                                    Divider()
+                                    Button("Move to Trash", role: .destructive) {
+                                        appState.moveToTrash(node.url)
+                                    }
+                                } else {
+                                    Button("Reveal in Finder") {
+                                        NSWorkspace.shared.activateFileViewerSelecting([node.url])
+                                    }
                                 }
                             }
                     }
                 } header: {
-                    Text(folder.url.lastPathComponent)
-                        .contextMenu {
-                            Button("Reveal in Finder") {
-                                NSWorkspace.shared.activateFileViewerSelecting([folder.url])
-                            }
-                            Divider()
-                            Button("Remove from Sidebar") {
-                                appState.removeFolder(folder.url)
-                            }
+                    HStack {
+                        Text(folder.url.lastPathComponent)
+                        Spacer()
+                        Text("\(folder.files.count)")
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(.secondary)
+                    }
+                    .contextMenu {
+                        Button("New File in \(folder.url.lastPathComponent)") {
+                            appState.createNewFile(in: folder.url)
                         }
+                        Button("Reveal in Finder") {
+                            NSWorkspace.shared.activateFileViewerSelecting([folder.url])
+                        }
+                        Divider()
+                        Button("Remove from Sidebar") {
+                            appState.removeFolder(folder.url)
+                        }
+                    }
                 }
             }
         }
         .listStyle(.sidebar)
+        .scrollContentBackground(.hidden)
+        .background(theme.sidebar)
     }
 
     private var resultsList: some View {
@@ -86,6 +118,8 @@ struct FileListView: View {
             .tag(result.url)
         }
         .listStyle(.sidebar)
+        .scrollContentBackground(.hidden)
+        .background(theme.sidebar)
     }
 
     private var title: String {
@@ -101,5 +135,10 @@ struct FileListView: View {
             return "\(appState.searchResults.count) match\(appState.searchResults.count == 1 ? "" : "es")"
         }
         return "\(appState.mdFiles.count) file\(appState.mdFiles.count == 1 ? "" : "s")"
+    }
+
+    private func copy(_ string: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(string, forType: .string)
     }
 }

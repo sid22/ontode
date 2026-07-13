@@ -3,78 +3,85 @@ import Splash
 import SwiftUI
 
 enum AppTheme: String, CaseIterable {
-    case solarizedDark
-    case solarizedLight
+    case dark
+    case light
 
     var colorScheme: ColorScheme {
-        self == .solarizedDark ? .dark : .light
+        self == .dark ? .dark : .light
     }
 
     var canvas: SwiftUI.Color { SwiftUI.Color(nsColor: nsCanvas) }
+    var sidebar: SwiftUI.Color { SwiftUI.Color(nsColor: nsSidebar) }
     var raised: SwiftUI.Color { SwiftUI.Color(nsColor: nsRaised) }
     var text: SwiftUI.Color { SwiftUI.Color(nsColor: nsText) }
     var emphasis: SwiftUI.Color { SwiftUI.Color(nsColor: nsEmphasis) }
     var secondary: SwiftUI.Color { SwiftUI.Color(nsColor: nsSecondary) }
-    var accent: SwiftUI.Color { SwiftUI.Color(nsColor: Solarized.blue) }
-    var border: SwiftUI.Color { secondary.opacity(0.35) }
+    var accent: SwiftUI.Color { SwiftUI.Color(nsColor: nsAccent) }
+    var border: SwiftUI.Color { emphasis.opacity(self == .dark ? 0.12 : 0.10) }
 
     var splashTheme: Splash.Theme {
-        Splash.Theme(
+        let tokens: [TokenType: Splash.Color]
+        switch self {
+        case .dark:
+            tokens = [
+                .keyword: Self.rgb(198, 120, 221),
+                .string: Self.rgb(152, 195, 121),
+                .type: Self.rgb(229, 192, 123),
+                .call: Self.rgb(97, 175, 239),
+                .number: Self.rgb(209, 154, 102),
+                .comment: nsSecondary,
+                .property: Self.rgb(97, 175, 239),
+                .dotAccess: Self.rgb(86, 182, 194),
+                .preprocessing: Self.rgb(224, 108, 117),
+            ]
+        case .light:
+            tokens = [
+                .keyword: Self.rgb(166, 38, 164),
+                .string: Self.rgb(80, 161, 79),
+                .type: Self.rgb(193, 132, 1),
+                .call: Self.rgb(64, 120, 242),
+                .number: Self.rgb(152, 104, 1),
+                .comment: nsSecondary,
+                .property: Self.rgb(64, 120, 242),
+                .dotAccess: Self.rgb(1, 132, 188),
+                .preprocessing: Self.rgb(228, 86, 73),
+            ]
+        }
+        return Splash.Theme(
             font: Splash.Font(size: 12.5),
             plainTextColor: nsText,
-            tokenColors: [
-                .keyword: Solarized.green,
-                .string: Solarized.cyan,
-                .type: Solarized.yellow,
-                .call: Solarized.blue,
-                .number: Solarized.magenta,
-                .comment: nsSecondary,
-                .property: Solarized.blue,
-                .dotAccess: Solarized.orange,
-                .preprocessing: Solarized.orange,
-            ],
+            tokenColors: tokens,
             backgroundColor: nsRaised
         )
     }
 
     private var nsCanvas: NSColor {
-        self == .solarizedDark ? Solarized.base03 : Solarized.base3
+        self == .dark ? Self.rgb(30, 30, 30) : Self.rgb(255, 255, 255)
+    }
+
+    private var nsSidebar: NSColor {
+        self == .dark ? Self.rgb(24, 24, 24) : Self.rgb(246, 246, 247)
     }
 
     private var nsRaised: NSColor {
-        self == .solarizedDark ? Solarized.base02 : Solarized.base2
+        self == .dark ? Self.rgb(42, 42, 42) : Self.rgb(240, 240, 241)
     }
 
     private var nsText: NSColor {
-        self == .solarizedDark ? Solarized.base0 : Solarized.base00
+        self == .dark ? Self.rgb(218, 218, 218) : Self.rgb(38, 40, 43)
     }
 
     private var nsEmphasis: NSColor {
-        self == .solarizedDark ? Solarized.base1 : Solarized.base01
+        self == .dark ? Self.rgb(240, 240, 240) : Self.rgb(16, 16, 16)
     }
 
     private var nsSecondary: NSColor {
-        self == .solarizedDark ? Solarized.base01 : Solarized.base1
+        self == .dark ? Self.rgb(150, 150, 150) : Self.rgb(130, 132, 136)
     }
-}
 
-enum Solarized {
-    static let base03 = rgb(0, 43, 54)
-    static let base02 = rgb(7, 54, 66)
-    static let base01 = rgb(88, 110, 117)
-    static let base00 = rgb(101, 123, 131)
-    static let base0 = rgb(131, 148, 150)
-    static let base1 = rgb(147, 161, 161)
-    static let base2 = rgb(238, 232, 213)
-    static let base3 = rgb(253, 246, 227)
-    static let yellow = rgb(181, 137, 0)
-    static let orange = rgb(203, 75, 22)
-    static let red = rgb(220, 50, 47)
-    static let magenta = rgb(211, 54, 130)
-    static let violet = rgb(108, 113, 196)
-    static let blue = rgb(38, 139, 210)
-    static let cyan = rgb(42, 161, 152)
-    static let green = rgb(133, 153, 0)
+    private var nsAccent: NSColor {
+        self == .dark ? Self.rgb(138, 111, 245) : Self.rgb(107, 82, 216)
+    }
 
     private static func rgb(_ red: Int, _ green: Int, _ blue: Int) -> NSColor {
         NSColor(
@@ -87,7 +94,7 @@ enum Solarized {
 }
 
 private struct AppThemeKey: EnvironmentKey {
-    static let defaultValue = AppTheme.solarizedDark
+    static let defaultValue = AppTheme.dark
 }
 
 extension EnvironmentValues {

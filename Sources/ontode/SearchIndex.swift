@@ -16,12 +16,15 @@ struct SearchResult: Identifiable {
 
 protocol SearchIndex {
     func reindex(_ entries: [SearchEntry])
-    func search(_ query: String) -> [SearchResult]
+    func search(_ query: String, completion: @escaping @MainActor ([SearchResult]) -> Void)
 }
 
 final class FTS5SearchIndex: SearchIndex {
     private var db: OpaquePointer?
     private let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+    private let queue = DispatchQueue(label: "ontode.search-index", qos: .userInitiated)
+    private var reindexGeneration = 0
+    private let generationLock = NSLock()
 
     init() {
         if sqlite3_open(":memory:", &db) != SQLITE_OK {
@@ -35,6 +38,32 @@ final class FTS5SearchIndex: SearchIndex {
     }
 
     func reindex(_ entries: [SearchEntry]) {
+        generationLock.lock()
+        reindexGeneration += 1
+        let generation = reindexGeneration
+        generationLock.unlock()
+        queue.async { [weak self] in
+            guard let self else { return }
+            self.generationLock.lock()
+            let isCurrent = generation == self.reindexGeneration
+            self.generationLock.unlock()
+            guard isCurrent else { return }
+            self.performReindex(entries)
+        }
+    }
+
+    func search(_ query: String, completion: @escaping @MainActor ([SearchResult]) -> Void) {
+        queue.async { [weak self] in
+            let results = self?.performSearch(query) ?? []
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    completion(results)
+                }
+            }
+        }
+    }
+
+    private func performReindex(_ entries: [SearchEntry]) {
         guard db != nil else { return }
         exec("DELETE FROM docs")
         exec("BEGIN")
@@ -56,7 +85,7 @@ final class FTS5SearchIndex: SearchIndex {
         exec("COMMIT")
     }
 
-    func search(_ query: String) -> [SearchResult] {
+    private func performSearch(_ query: String) -> [SearchResult] {
         guard db != nil else { return [] }
         let tokens = query
             .split(whereSeparator: { $0.isWhitespace })

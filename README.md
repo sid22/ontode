@@ -11,12 +11,20 @@ docs.
 ## Features
 
 - **Reader** — GFM rendering (headings, lists, task lists, tables, block quotes, code
-  blocks) built on [swift-markdown], with Swift syntax highlighting via [Splash]
+  blocks) built on [swift-markdown], with Swift syntax highlighting via [Splash], plus
+  a breadcrumb path and a word count badge
+- **Tabs** — every file opens in a tab; switch with ⇧⌘] / ⇧⌘[, close with ⌘W
 - **Multiple folders** — add any number of folders (⌘O, multi-select, or drag and drop);
-  each appears as its own sidebar section, and search, quick open, and wikilinks span
-  all of them; remove one via its section header's context menu
-- **File tree** — sidebar nested by directory per folder, hidden files excluded
-- **Full-text search** — SQLite FTS5 with prefix matching and ranked snippet results
+  each appears as its own sidebar section with a file count, and search, quick open,
+  and wikilinks span all of them; remove one via its section header's context menu
+- **Session restore** — folders, open tabs, and the selected file come back on launch
+- **File tree** — sidebar nested by directory per folder, hidden files excluded; context
+  menu with Open in Default Editor, Reveal in Finder, Copy Path / Wikilink, and Move to
+  Trash
+- **New files** — ⌘N creates `Untitled.md` in the current folder and drops you straight
+  into editing; also per-folder via the section header's context menu
+- **Full-text search** — SQLite FTS5 with prefix matching and ranked snippet results,
+  indexed in the background so big folders never block the UI
 - **Live updates** — FSEvents watcher rescans the folder and re-renders the open file
   when anything changes
 - **Wikilinks** — `[[note]]` and `[[note|label]]` resolve to files in the open folder
@@ -24,8 +32,9 @@ docs.
 - **In-place editing** — Obsidian-style: click a block to place the cursor, press Return
   or double-click to reveal its raw Markdown and edit it right there; Esc, ⌘⏎, or
   clicking away saves straight back to disk
-- **Solarized themes** — Solarized Dark by default, with a one-click toggle to Solarized
-  Light (toolbar sun/moon button or ⇧⌘L); your choice is remembered
+- **Raw source** — ⌘/ toggles the whole file as plain, selectable Markdown source
+- **Themes** — a neutral Obsidian-style dark theme by default, with a one-click toggle
+  to light (toolbar sun/moon button or ⇧⌘L); your choice is remembered
 
 ## Requirements
 
@@ -45,13 +54,17 @@ Or from the command line: `swift run`.
 | Shortcut | Action |
 | --- | --- |
 | ⌘O | Add folder(s) |
+| ⌘N | New file in the current folder |
 | ⌘P | Quick open file |
+| ⌘W / ⇧⌘W | Close tab / close window |
+| ⇧⌘] / ⇧⌘[ | Next / previous tab |
 | ⌥⌘↑ / ⌥⌘↓ | Previous / next file |
 | ↑ / ↓ | Move through the sidebar, or move the block cursor in the reader |
 | Return or double-click | Edit the focused block in place |
 | ⌘E | Edit the focused block |
 | Esc or ⌘⏎ | Finish editing and save |
-| ⇧⌘L | Toggle Solarized Light / Dark |
+| ⌘/ | Toggle raw Markdown source |
+| ⇧⌘L | Toggle light / dark theme |
 
 ## License
 

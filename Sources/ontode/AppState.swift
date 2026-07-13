@@ -5,11 +5,13 @@ import SwiftUI
 final class AppState: ObservableObject {
     @Published var workspaceFolders: [WorkspaceFolder] = []
     @Published var mdFiles: [URL] = []
+    @Published var openTabs: [URL] = []
     @Published var selectedFile: URL?
     @Published var fileContent: String = ""
     @Published var blocks: [MDBlock] = []
     @Published var searchResults: [SearchResult] = []
     @Published var quickOpenPresented = false
+    @Published var showSource = false
     @Published var focusedBlockID: UUID?
     @Published var editingBlockID: UUID?
     @Published var editingDraft: String = ""
@@ -22,22 +24,37 @@ final class AppState: ObservableObject {
 
     static let wholeFileEditID = UUID()
     private static let themeKey = "ontode.theme"
+    private static let foldersKey = "ontode.folders"
+    private static let tabsKey = "ontode.openTabs"
+    private static let selectionKey = "ontode.selectedFile"
 
     private let searchIndex: SearchIndex = FTS5SearchIndex()
     private var watchers: [URL: FolderWatcher] = [:]
     private var editingLineRange: ClosedRange<Int>?
+    private var scanGeneration = 0
+    private var scanTask: Task<Void, Never>?
 
     init() {
-        let stored = UserDefaults.standard.string(forKey: Self.themeKey)
-        theme = stored.flatMap(AppTheme.init(rawValue:)) ?? .solarizedDark
+        let stored = UserDefaults.standard.string(forKey: Self.themeKey) ?? ""
+        theme = stored.lowercased().contains("light") ? .light : .dark
+        restoreSession()
     }
 
     var hasFolders: Bool {
         !workspaceFolders.isEmpty
     }
 
+    var wordCount: Int {
+        fileContent.split(whereSeparator: \.isWhitespace).count
+    }
+
     func toggleTheme() {
-        theme = theme == .solarizedDark ? .solarizedLight : .solarizedDark
+        theme = theme == .dark ? .light : .dark
+    }
+
+    func toggleSource() {
+        commitEditing()
+        showSource.toggle()
     }
 
     func openFolderPicker() {
@@ -58,18 +75,9 @@ final class AppState: ObservableObject {
         guard folderRoot(for: url) == nil else { return }
         guard !workspaceFolders.contains(where: { $0.url.path.hasPrefix(url.path + "/") }) else { return }
         commitEditing()
-        workspaceFolders.append(WorkspaceFolder(url: url))
-
-        let watcher = FolderWatcher(url: url) { [weak self] in
-            self?.folderDidChange()
-        }
-        watchers[url] = watcher
-        watcher.start()
-
+        attachFolder(url)
+        persistFolders()
         rescan()
-        if selectedFile == nil, let first = mdFiles.first {
-            selectFile(first)
-        }
     }
 
     func removeFolder(_ url: URL) {
@@ -77,13 +85,13 @@ final class AppState: ObservableObject {
         watchers[url]?.stop()
         watchers[url] = nil
         workspaceFolders.removeAll { $0.url == url }
-        rescan()
-        if let selectedFile, !mdFiles.contains(selectedFile) {
-            self.selectedFile = nil
-            focusedBlockID = nil
-            fileContent = ""
-            blocks = []
+        persistFolders()
+        openTabs.removeAll { folderRoot(for: $0) == nil }
+        if let selectedFile, !openTabs.contains(selectedFile) {
+            showFile(openTabs.first)
         }
+        persistSession()
+        rescan()
     }
 
     func folderRoot(for url: URL) -> URL? {
@@ -95,9 +103,77 @@ final class AppState: ObservableObject {
 
     func selectFile(_ url: URL) {
         commitEditing()
+        if !openTabs.contains(url) {
+            openTabs.append(url)
+        }
         focusedBlockID = nil
         selectedFile = url
         loadContent(from: url)
+        persistSession()
+    }
+
+    func closeTab(_ url: URL) {
+        guard let index = openTabs.firstIndex(of: url) else { return }
+        commitEditing()
+        openTabs.remove(at: index)
+        if selectedFile == url {
+            let fallback = openTabs.indices.contains(index) ? openTabs[index] : openTabs.last
+            showFile(fallback)
+        }
+        persistSession()
+    }
+
+    func closeCurrentTab() {
+        if let selectedFile {
+            closeTab(selectedFile)
+        } else {
+            NSApp.keyWindow?.performClose(nil)
+        }
+    }
+
+    func selectAdjacentTab(_ delta: Int) {
+        guard !openTabs.isEmpty else { return }
+        guard let selectedFile, let index = openTabs.firstIndex(of: selectedFile) else {
+            selectFile(delta > 0 ? openTabs[0] : openTabs[openTabs.count - 1])
+            return
+        }
+        let next = (index + delta + openTabs.count) % openTabs.count
+        selectFile(openTabs[next])
+    }
+
+    func createNewFile() {
+        let root = selectedFile.flatMap { folderRoot(for: $0) } ?? workspaceFolders.first?.url
+        guard let root else { return }
+        createNewFile(in: root)
+    }
+
+    func createNewFile(in root: URL) {
+        commitEditing()
+        var name = "Untitled.md"
+        var counter = 2
+        while FileManager.default.fileExists(atPath: root.appendingPathComponent(name).path) {
+            name = "Untitled \(counter).md"
+            counter += 1
+        }
+        let url = root.appendingPathComponent(name)
+        guard FileManager.default.createFile(atPath: url.path, contents: Data()) else { return }
+        rescan()
+        selectFile(url)
+        showSource = false
+        beginEditingWholeFile()
+    }
+
+    func moveToTrash(_ url: URL) {
+        commitEditing()
+        do {
+            try FileManager.default.trashItem(at: url, resultingItemURL: nil)
+        } catch {
+            return
+        }
+        if openTabs.contains(url) {
+            closeTab(url)
+        }
+        rescan()
     }
 
     func relativePath(for url: URL) -> String {
@@ -109,6 +185,17 @@ final class AppState: ObservableObject {
         guard let base = folderRoot(for: url) else { return url.lastPathComponent }
         let relative = String(url.path.dropFirst(base.path.count + 1))
         return workspaceFolders.count > 1 ? base.lastPathComponent + "/" + relative : relative
+    }
+
+    func breadcrumb(for url: URL) -> [String] {
+        var parts = relativePath(for: url).split(separator: "/").map(String.init)
+        if workspaceFolders.count > 1, let base = folderRoot(for: url) {
+            parts.insert(base.lastPathComponent, at: 0)
+        }
+        if let last = parts.last {
+            parts[parts.count - 1] = (last as NSString).deletingPathExtension
+        }
+        return parts
     }
 
     func openWikilink(_ target: String) {
@@ -232,14 +319,110 @@ final class AppState: ObservableObject {
             .map(\.0)
     }
 
+    private func attachFolder(_ url: URL) {
+        workspaceFolders.append(WorkspaceFolder(url: url))
+        let watcher = FolderWatcher(url: url) { [weak self] in
+            self?.folderDidChange()
+        }
+        watchers[url] = watcher
+        watcher.start()
+    }
+
+    private func restoreSession() {
+        let defaults = UserDefaults.standard
+        var isDirectory: ObjCBool = false
+        for path in defaults.stringArray(forKey: Self.foldersKey) ?? [] {
+            guard FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory),
+                  isDirectory.boolValue else { continue }
+            let url = URL(fileURLWithPath: path)
+            guard folderRoot(for: url) == nil else { continue }
+            attachFolder(url)
+        }
+        guard hasFolders else { return }
+        openTabs = (defaults.stringArray(forKey: Self.tabsKey) ?? [])
+            .map { URL(fileURLWithPath: $0) }
+            .filter { folderRoot(for: $0) != nil && FileManager.default.fileExists(atPath: $0.path) }
+        if let selectedPath = defaults.string(forKey: Self.selectionKey) {
+            let url = URL(fileURLWithPath: selectedPath)
+            if openTabs.contains(url) {
+                selectedFile = url
+                loadContent(from: url)
+            }
+        }
+        if selectedFile == nil, let first = openTabs.first {
+            selectedFile = first
+            loadContent(from: first)
+        }
+        rescan()
+    }
+
+    private func persistFolders() {
+        UserDefaults.standard.set(workspaceFolders.map(\.url.path), forKey: Self.foldersKey)
+    }
+
+    private func persistSession() {
+        let defaults = UserDefaults.standard
+        defaults.set(openTabs.map(\.path), forKey: Self.tabsKey)
+        defaults.set(selectedFile?.path, forKey: Self.selectionKey)
+    }
+
+    private func showFile(_ url: URL?) {
+        editingBlockID = nil
+        editingLineRange = nil
+        focusedBlockID = nil
+        selectedFile = url
+        if let url {
+            loadContent(from: url)
+        } else {
+            fileContent = ""
+            blocks = []
+        }
+    }
+
     private func rescan() {
-        for index in workspaceFolders.indices {
-            let root = workspaceFolders[index].url
-            let files = FolderScanner.scan(folder: root)
-            workspaceFolders[index].files = files
-            workspaceFolders[index].tree = FileNode.tree(for: files, in: root)
+        scanGeneration += 1
+        let generation = scanGeneration
+        let roots = workspaceFolders.map(\.url)
+        scanTask?.cancel()
+        scanTask = Task.detached(priority: .userInitiated) { [weak self] in
+            var scanned: [(root: URL, files: [URL], tree: [FileNode])] = []
+            for root in roots {
+                if Task.isCancelled { return }
+                let files = FolderScanner.scan(folder: root)
+                scanned.append((root, files, FileNode.tree(for: files, in: root)))
+            }
+            guard !Task.isCancelled, let self else { return }
+            let results = scanned
+            await MainActor.run {
+                guard generation == self.scanGeneration else { return }
+                self.applyScan(results)
+            }
+        }
+    }
+
+    private func applyScan(_ scanned: [(root: URL, files: [URL], tree: [FileNode])]) {
+        for entry in scanned {
+            guard let index = workspaceFolders.firstIndex(where: { $0.url == entry.root }) else { continue }
+            workspaceFolders[index].files = entry.files
+            workspaceFolders[index].tree = entry.tree
         }
         mdFiles = workspaceFolders.flatMap(\.files)
+
+        let known = Set(mdFiles)
+        openTabs.removeAll { !known.contains($0) && !FileManager.default.fileExists(atPath: $0.path) }
+        if let selectedFile, !openTabs.contains(selectedFile) {
+            showFile(openTabs.first)
+            persistSession()
+        } else if let selectedFile, editingBlockID == nil,
+                  let content = try? String(contentsOf: selectedFile, encoding: .utf8),
+                  content != fileContent {
+            fileContent = content
+            blocks = MarkdownBuilder.blocks(from: content)
+            focusedBlockID = nil
+        } else if selectedFile == nil, openTabs.isEmpty, let first = mdFiles.first {
+            selectFile(first)
+        }
+
         reindexSearch()
         runSearch()
     }
@@ -251,20 +434,6 @@ final class AppState: ObservableObject {
     private func folderDidChange() {
         guard hasFolders else { return }
         rescan()
-        if let selectedFile {
-            if mdFiles.contains(selectedFile) {
-                if editingBlockID == nil {
-                    loadContent(from: selectedFile)
-                }
-            } else {
-                self.selectedFile = nil
-                editingBlockID = nil
-                editingLineRange = nil
-                focusedBlockID = nil
-                fileContent = ""
-                blocks = []
-            }
-        }
     }
 
     private func loadContent(from url: URL) {
@@ -279,7 +448,14 @@ final class AppState: ObservableObject {
 
     private func runSearch() {
         let trimmed = searchQuery.trimmingCharacters(in: .whitespaces)
-        searchResults = trimmed.isEmpty ? [] : searchIndex.search(trimmed)
+        guard !trimmed.isEmpty else {
+            searchResults = []
+            return
+        }
+        searchIndex.search(trimmed) { [weak self] results in
+            guard let self, self.searchQuery.trimmingCharacters(in: .whitespaces) == trimmed else { return }
+            self.searchResults = results
+        }
     }
 
     private static func fuzzyScore(_ query: String, in candidate: String) -> Int? {

@@ -18,10 +18,10 @@ struct ContentView: View {
                                 Button(action: { appState.toggleTheme() }) {
                                     Label(
                                         "Toggle Theme",
-                                        systemImage: appState.theme == .solarizedDark ? "sun.max" : "moon"
+                                        systemImage: appState.theme == .dark ? "sun.max" : "moon"
                                     )
                                 }
-                                .help("Switch between Solarized Light and Dark (⇧⌘L)")
+                                .help("Switch between Light and Dark (⇧⌘L)")
                             }
                         }
                 }

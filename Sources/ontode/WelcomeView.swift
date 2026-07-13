@@ -10,8 +10,8 @@ struct WelcomeView: View {
                     .fill(
                         LinearGradient(
                             colors: [
-                                Color(red: 0.16, green: 0.19, blue: 0.30),
-                                Color(red: 0.09, green: 0.10, blue: 0.16),
+                                Color(red: 0.36, green: 0.28, blue: 0.72),
+                                Color(red: 0.18, green: 0.13, blue: 0.40),
                             ],
                             startPoint: .top,
                             endPoint: .bottom
