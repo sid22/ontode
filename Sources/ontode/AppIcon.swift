@@ -6,6 +6,14 @@ enum AppIcon {
     }
 
     private static var image: NSImage {
+        if let url = Bundle.module.url(forResource: "AppIcon", withExtension: "png"),
+           let icon = NSImage(contentsOf: url) {
+            return icon
+        }
+        return fallbackImage
+    }
+
+    private static var fallbackImage: NSImage {
         NSImage(size: NSSize(width: 512, height: 512), flipped: false) { rect in
             let path = NSBezierPath(roundedRect: rect.insetBy(dx: 44, dy: 44), xRadius: 100, yRadius: 100)
             let gradient = NSGradient(

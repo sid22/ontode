@@ -15,7 +15,8 @@ let package = Package(
                 .product(name: "Markdown", package: "swift-markdown"),
                 .product(name: "Splash", package: "Splash"),
             ],
-            path: "Sources/ontode"
+            path: "Sources/ontode",
+            resources: [.process("Resources/AppIcon.png")]
         )
     ]
 )
