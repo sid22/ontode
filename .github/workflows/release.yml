@@ -88,6 +88,8 @@ jobs:
               <true/>
               <key>NSHumanReadableCopyright</key>
               <string>Created by Siddharth Goyal</string>
+              <key>SUPublicEDKey</key>
+              <string>b8f+LUmWHJbT5rXcuLWQMlBJ7/cKrLNSS3JzpvtTOjs=</string>
               <key>SUFeedURL</key>
               <string>https://github.com/sid22/ontode/releases/latest/download/appcast.xml</string>
               <key>SUEnableAutomaticChecks</key>
@@ -103,6 +105,22 @@ jobs:
           cp -R build/ontode.app build/dmg/
           ln -s /Applications build/dmg/Applications
           hdiutil create -volname ontode -srcfolder build/dmg -ov -format UDZO build/ontode.dmg
+
+      - name: Sign DMG
+        id: sign
+        run: |
+          cat > sign.swift <<'EOF'
+          import Foundation
+          import CryptoKit
+          let keyB64 = "0ta0cRhx+zpudERcmK0TfWXm2os2lKW+hYkgNDHuzo9vx/4tSZYcltPmtdy4tZAyUEnv9wqss1JLcnOm+1M6Ow=="
+          let keyData = Data(base64Encoded: keyB64)!
+          let seed = keyData.prefix(32)
+          let privateKey = try! Curve25519.Signing.PrivateKey(rawRepresentation: seed)
+          let dmgData = try! Data(contentsOf: URL(fileURLWithPath: "build/ontode.dmg"))
+          let signature = try! privateKey.signature(for: dmgData)
+          print("sig=\(signature.base64EncodedString())")
+          EOF
+          swift sign.swift >> $GITHUB_OUTPUT
 
       - name: Generate appcast.xml
         run: |
@@ -125,6 +143,7 @@ jobs:
                 <sparkle:version>${{ github.run_number }}</sparkle:version>
                 <sparkle:shortVersionString>${VERSION}</sparkle:shortVersionString>
                 <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+                <sparkle:edSignature>${{ steps.sign.outputs.sig }}</sparkle:edSignature>
                 <enclosure url="https://github.com/sid22/ontode/releases/download/${TAG}/ontode.dmg"
                            length="${DMG_SIZE}"
                            type="application/octet-stream" />
