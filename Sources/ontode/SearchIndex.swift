@@ -37,6 +37,9 @@ final class FTS5SearchIndex: SearchIndex {
             db = nil
         }
         exec("PRAGMA journal_mode = WAL")
+        exec("PRAGMA synchronous = NORMAL")
+        exec("PRAGMA wal_autocheckpoint = 400")
+        exec("PRAGMA cache_size = -4000")
         exec("CREATE VIRTUAL TABLE IF NOT EXISTS docs USING fts5(path UNINDEXED, name, body, tokenize = 'porter unicode61')")
         exec("CREATE TABLE IF NOT EXISTS file_meta (path TEXT PRIMARY KEY, mtime REAL NOT NULL)")
     }
@@ -88,6 +91,11 @@ final class FTS5SearchIndex: SearchIndex {
         // Determine the set of paths that were previously indexed.
         var previousPaths = Set(storedMtimes.keys)
 
+        // Commit in batches so the WAL stays bounded (a single transaction over a large
+        // corpus grows the WAL and dirty-page cache until the final COMMIT), and wrap each
+        // file's read in an autorelease pool so temporary buffers don't accumulate.
+        let batchSize = 500
+        var pending = 0
         exec("BEGIN")
 
         // Upsert new / changed files.
@@ -100,17 +108,35 @@ final class FTS5SearchIndex: SearchIndex {
                 continue
             }
 
-            // Remove stale rows (if any) then insert fresh data.
-            deleteDoc(atPath: path)
-            insertDoc(entry: entry, mtime: actualMtime)
+            autoreleasepool {
+                // Remove stale rows (if any) then insert fresh data.
+                deleteDoc(atPath: path)
+                insertDoc(entry: entry, mtime: actualMtime)
+            }
+            pending += 1
+            if pending >= batchSize {
+                exec("COMMIT")
+                exec("BEGIN")
+                pending = 0
+            }
         }
 
         // Remove rows for files that no longer exist in the entries list.
         for stalePath in previousPaths {
             deleteDoc(atPath: stalePath)
+            pending += 1
+            if pending >= batchSize {
+                exec("COMMIT")
+                exec("BEGIN")
+                pending = 0
+            }
         }
 
         exec("COMMIT")
+
+        // Collapse the WAL back to a small file once the (potentially large) initial index
+        // is written, so its pages are not retained.
+        exec("PRAGMA wal_checkpoint(TRUNCATE)")
     }
 
     /// Returns the file's `contentModificationDate` as a `TimeInterval` (seconds since reference date), or `nil` on failure.
