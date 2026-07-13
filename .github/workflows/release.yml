@@ -89,7 +89,7 @@ jobs:
               <key>NSHumanReadableCopyright</key>
               <string>Created by Siddharth Goyal</string>
               <key>SUPublicEDKey</key>
-              <string>b8f+LUmWHJbT5rXcuLWQMlBJ7/cKrLNSS3JzpvtTOjs=</string>
+              <string>UtNQXk2Nc/8bt5hP/Ile72Mf8JPhjsP1uJxwaJ3p9Mo=</string>
               <key>SUFeedURL</key>
               <string>https://github.com/sid22/ontode/releases/latest/download/appcast.xml</string>
               <key>SUEnableAutomaticChecks</key>
@@ -108,13 +108,20 @@ jobs:
 
       - name: Sign DMG
         id: sign
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
         run: |
           cat > sign.swift <<'EOF'
           import Foundation
           import CryptoKit
-          let keyB64 = "0ta0cRhx+zpudERcmK0TfWXm2os2lKW+hYkgNDHuzo9vx/4tSZYcltPmtdy4tZAyUEnv9wqss1JLcnOm+1M6Ow=="
-          let keyData = Data(base64Encoded: keyB64)!
-          let seed = keyData.prefix(32)
+          guard let keyB64 = ProcessInfo.processInfo.environment["SPARKLE_PRIVATE_KEY"], !keyB64.isEmpty else {
+              FileHandle.standardError.write(Data("SPARKLE_PRIVATE_KEY secret is not set\n".utf8))
+              exit(1)
+          }
+          guard let seed = Data(base64Encoded: keyB64), seed.count == 32 else {
+              FileHandle.standardError.write(Data("SPARKLE_PRIVATE_KEY is not a base64-encoded 32-byte seed\n".utf8))
+              exit(1)
+          }
           let privateKey = try! Curve25519.Signing.PrivateKey(rawRepresentation: seed)
           let dmgData = try! Data(contentsOf: URL(fileURLWithPath: "build/ontode.dmg"))
           let signature = try! privateKey.signature(for: dmgData)

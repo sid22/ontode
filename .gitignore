@@ -7,3 +7,4 @@ xcuserdata/
 .DS_Store
 .claude/
 .venv/
+sparkle_private_key.b64
