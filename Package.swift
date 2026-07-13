@@ -18,7 +18,7 @@ let package = Package(
                 .product(name: "Sparkle", package: "Sparkle"),
             ],
             path: "Sources/ontode",
-            resources: [.process("Resources/AppIcon.png")]
+            resources: [.process("Resources")]
         )
     ]
 )
