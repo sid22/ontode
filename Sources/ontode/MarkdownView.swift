@@ -170,7 +170,7 @@ struct MDBlockView: View {
         }
     }
 
-    private func listView(items: [MDListItem], marker: (Int) -> String) -> some View {
+    private func listView(items: [MDListItem], marker: @escaping (Int) -> String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
