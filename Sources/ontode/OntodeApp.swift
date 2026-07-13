@@ -28,6 +28,12 @@ struct OntodeApp: App {
                 .keyboardShortcut("o", modifiers: .command)
             }
             CommandGroup(replacing: .saveItem) {
+                Button("Save") {
+                    appState.commitEditing()
+                }
+                .keyboardShortcut("s", modifiers: .command)
+                .disabled(appState.editingBlockID == nil)
+                Divider()
                 Button("Close Tab") {
                     appState.closeCurrentTab()
                 }

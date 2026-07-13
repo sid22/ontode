@@ -32,6 +32,13 @@ struct FileListView: View {
         .navigationSubtitle(subtitle)
         .toolbar {
             ToolbarItem {
+                Button(action: { appState.createNewFile() }) {
+                    Label("New File", systemImage: "doc.badge.plus")
+                }
+                .help("New File")
+                .disabled(!appState.hasFolders)
+            }
+            ToolbarItem {
                 Button(action: { appState.openFolderPicker() }) {
                     Label("Add Folder", systemImage: "folder.badge.plus")
                 }
@@ -45,35 +52,43 @@ struct FileListView: View {
             ForEach(appState.workspaceFolders) { folder in
                 Section {
                     OutlineGroup(folder.tree, children: \.children) { node in
-                        Label(node.name, systemImage: node.children == nil ? "doc.text" : "folder.fill")
+                        if node.children == nil {
+                            FileNodeRow(node: node, appState: appState) {
+                                appState.moveToTrash(node.url)
+                            }
                             .help(node.url.path)
                             .tag(node.url)
-                            .selectionDisabled(node.children != nil)
+                            .selectionDisabled(false)
                             .contextMenu {
-                                if node.children == nil {
-                                    Button("Open in Default Editor") {
-                                        NSWorkspace.shared.open(node.url)
-                                    }
-                                    Button("Reveal in Finder") {
-                                        NSWorkspace.shared.activateFileViewerSelecting([node.url])
-                                    }
-                                    Divider()
-                                    Button("Copy Path") {
-                                        copy(node.url.path)
-                                    }
-                                    Button("Copy Wikilink") {
-                                        copy("[[" + node.url.deletingPathExtension().lastPathComponent + "]]")
-                                    }
-                                    Divider()
-                                    Button("Move to Trash", role: .destructive) {
-                                        appState.moveToTrash(node.url)
-                                    }
-                                } else {
+                                Button("Open in Default Editor") {
+                                    NSWorkspace.shared.open(node.url)
+                                }
+                                Button("Reveal in Finder") {
+                                    NSWorkspace.shared.activateFileViewerSelecting([node.url])
+                                }
+                                Divider()
+                                Button("Copy Path") {
+                                    copy(node.url.path)
+                                }
+                                Button("Copy Wikilink") {
+                                    copy("[[" + node.url.deletingPathExtension().lastPathComponent + "]]")
+                                }
+                                Divider()
+                                Button("Move to Trash", role: .destructive) {
+                                    appState.moveToTrash(node.url)
+                                }
+                            }
+                        } else {
+                            Label(node.name, systemImage: "folder.fill")
+                                .help(node.url.path)
+                                .tag(node.url)
+                                .selectionDisabled(true)
+                                .contextMenu {
                                     Button("Reveal in Finder") {
                                         NSWorkspace.shared.activateFileViewerSelecting([node.url])
                                     }
                                 }
-                            }
+                        }
                     }
                 } header: {
                     HStack {
@@ -140,5 +155,29 @@ struct FileListView: View {
     private func copy(_ string: String) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(string, forType: .string)
+    }
+
+    // MARK: - FileNodeRow
+
+    private struct FileNodeRow: View {
+        let node: FileNode
+        let appState: AppState
+        let deleteAction: () -> Void
+
+        @State private var isHovered = false
+
+        var body: some View {
+            HStack {
+                Label(node.name, systemImage: "doc.text")
+                Spacer()
+                Button(action: deleteAction) {
+                    Image(systemName: "trash")
+                }
+                .buttonStyle(.plain)
+                .font(.caption)
+                .foregroundStyle(isHovered ? .red : .clear)
+            }
+            .onHover { isHovered = $0 }
+        }
     }
 }
