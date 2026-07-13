@@ -39,12 +39,20 @@ jobs:
             [ -e "$bundle" ] && cp -R "$bundle" "$APP/Contents/Resources/"
           done
 
-          # Copy Sparkle.framework into the app bundle
-          SPARKLE_PATH=$(find .build -path "*/artifacts/Sparkle/Sparkle.framework" -type d | head -1)
+          # Copy Sparkle.framework and SparkleCore.framework into the app bundle
+          mkdir -p "$APP/Contents/Frameworks"
+          SPARKLE_PATH=$(find .build -name "Sparkle.framework" -type d | head -1)
           if [ -n "$SPARKLE_PATH" ]; then
-            mkdir -p "$APP/Contents/Frameworks"
             cp -R "$SPARKLE_PATH" "$APP/Contents/Frameworks/"
           fi
+          SPARKLE_CORE_PATH=$(find .build -name "SparkleCore.framework" -type d | head -1)
+          if [ -n "$SPARKLE_CORE_PATH" ]; then
+            cp -R "$SPARKLE_CORE_PATH" "$APP/Contents/Frameworks/"
+          fi
+
+          # The binary is built with rpath @executable_path/../lib by default.
+          # Add Frameworks so it can find Sparkle.framework
+          install_name_tool -add_rpath @executable_path/../Frameworks "$APP/Contents/MacOS/ontode"
 
           cat > "$APP/Contents/Info.plist" <<'PLIST'
           <?xml version="1.0" encoding="UTF-8"?>
