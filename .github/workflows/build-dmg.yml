@@ -1,13 +1,27 @@
-name: Build DMG
+name: Build & Release
 
 on:
   workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
 
 jobs:
   build:
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            VERSION="0.0.0-dev"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Building version: $VERSION"
 
       - name: Build universal release binary
         run: swift build -c release --arch arm64 --arch x86_64
@@ -22,7 +36,15 @@ jobs:
           for bundle in "$BIN_PATH"/*.bundle; do
             [ -e "$bundle" ] && cp -R "$bundle" "$APP/Contents/Resources/"
           done
-          cat > "$APP/Contents/Info.plist" <<'PLIST'
+
+          # Copy Sparkle.framework into the app bundle
+          SPARKLE_PATH=$(find .build -path "*/artifacts/Sparkle/Sparkle.framework" -type d | head -1)
+          if [ -n "$SPARKLE_PATH" ]; then
+            mkdir -p "$APP/Contents/Frameworks"
+            cp -R "$SPARKLE_PATH" "$APP/Contents/Frameworks/"
+          fi
+
+          cat > "$APP/Contents/Info.plist" <<PLIST
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
@@ -36,12 +58,16 @@ jobs:
               <key>CFBundlePackageType</key>
               <string>APPL</string>
               <key>CFBundleShortVersionString</key>
-              <string>0.1.0</string>
+              <string>${{ steps.version.outputs.version }}</string>
               <key>CFBundleVersion</key>
-              <string>1</string>
+              <string>${{ github.run_number }}</string>
               <key>LSMinimumSystemVersion</key>
               <string>14.0</string>
               <key>NSHighResolutionCapable</key>
+              <true/>
+              <key>SUFeedURL</key>
+              <string>https://github.com/sid22/ontode/releases/latest/download/appcast.xml</string>
+              <key>SUEnableAutomaticChecks</key>
               <true/>
           </dict>
           </plist>
@@ -55,8 +81,53 @@ jobs:
           ln -s /Applications build/dmg/Applications
           hdiutil create -volname ontode -srcfolder build/dmg -ov -format UDZO build/ontode.dmg
 
+      - name: Generate appcast.xml
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          DMG_SIZE=$(stat -f%z build/ontode.dmg)
+          VERSION="${{ steps.version.outputs.version }}"
+          TAG="${GITHUB_REF#refs/tags/}"
+          DATE=$(date -u +"%a, %d %b %Y %H:%M:%S %z")
+
+          cat > build/appcast.xml <<EOF
+          <?xml version="1.0" encoding="utf-8"?>
+          <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+            <channel>
+              <title>ontode</title>
+              <link>https://github.com/sid22/ontode</link>
+              <description>ontode updates</description>
+              <language>en</language>
+              <item>
+                <title>Version ${VERSION}</title>
+                <pubDate>${DATE}</pubDate>
+                <sparkle:version>${{ github.run_number }}</sparkle:version>
+                <sparkle:shortVersionString>${VERSION}</sparkle:shortVersionString>
+                <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+                <enclosure url="https://github.com/sid22/ontode/releases/download/${TAG}/ontode.dmg"
+                           length="${DMG_SIZE}"
+                           type="application/octet-stream" />
+              </item>
+            </channel>
+          </rss>
+          EOF
+
       - name: Upload DMG artifact
         uses: actions/upload-artifact@v4
         with:
           name: ontode-dmg
           path: build/ontode.dmg
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ontode ${{ steps.version.outputs.version }}
+          body: |
+            ## ontode ${{ steps.version.outputs.version }}
+
+            Download `ontode.dmg` below, open it, and drag ontode to your Applications folder.
+
+            Existing users will be notified of this update automatically.
+          files: |
+            build/ontode.dmg
+            build/appcast.xml

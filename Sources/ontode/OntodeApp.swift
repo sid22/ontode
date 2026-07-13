@@ -4,6 +4,7 @@ import SwiftUI
 @main
 struct OntodeApp: App {
     @StateObject private var appState = AppState()
+    @StateObject private var updaterViewModel = CheckForUpdatesViewModel()
 
     init() {
         AppIcon.install()
@@ -16,6 +17,9 @@ struct OntodeApp: App {
                 .frame(minWidth: 860, minHeight: 520)
         }
         .commands {
+            CommandGroup(after: .appInfo) {
+                CheckForUpdatesView(viewModel: updaterViewModel)
+            }
             CommandGroup(replacing: .newItem) {
                 Button("New File") {
                     appState.createNewFile()
