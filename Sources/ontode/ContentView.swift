@@ -15,6 +15,17 @@ struct ContentView: View {
                     FileReaderView()
                         .toolbar {
                             ToolbarItem {
+                                Button(action: { appState.toggleReadingWidth() }) {
+                                    Label(
+                                        "Reading Width",
+                                        systemImage: appState.wideReading
+                                            ? "arrow.down.right.and.arrow.up.left"
+                                            : "arrow.up.left.and.arrow.down.right"
+                                    )
+                                }
+                                .help(appState.wideReading ? "Narrow the reading column" : "Widen the reading column")
+                            }
+                            ToolbarItem {
                                 Button(action: { appState.toggleTheme() }) {
                                     Label(
                                         "Toggle Theme",

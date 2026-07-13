@@ -72,6 +72,7 @@ private struct TabItemView: View {
         .contentShape(Rectangle())
         .onTapGesture { appState.selectFile(url) }
         .onHover { hovering = $0 }
+        .animation(.easeOut(duration: 0.1), value: hovering)
         .help(appState.displayPath(for: url))
     }
 }

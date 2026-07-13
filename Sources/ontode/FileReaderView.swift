@@ -57,10 +57,11 @@ struct FileReaderView: View {
             ScrollViewReader { proxy in
                 ScrollView(.vertical) {
                     MarkdownView()
-                        .padding(.horizontal, 28)
-                        .padding(.vertical, 24)
-                        .frame(maxWidth: 720, alignment: .leading)
+                        .padding(.horizontal, Metrics.readerHPadding)
+                        .padding(.vertical, Metrics.readerVPadding)
+                        .frame(maxWidth: appState.wideReading ? Metrics.readingWide : Metrics.readingNarrow, alignment: .leading)
                         .frame(maxWidth: .infinity)
+                        .animation(.easeInOut(duration: 0.2), value: appState.wideReading)
                 }
                 .focusable()
                 .focusEffectDisabled()
@@ -107,8 +108,8 @@ struct FileReaderView: View {
                 .foregroundStyle(theme.text)
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 28)
-                .padding(.vertical, 24)
+                .padding(.horizontal, Metrics.readerHPadding)
+                .padding(.vertical, Metrics.readerVPadding)
         }
     }
 

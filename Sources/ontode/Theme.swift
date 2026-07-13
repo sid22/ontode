@@ -93,6 +93,45 @@ enum AppTheme: String, CaseIterable {
     }
 }
 
+enum Metrics {
+    // Spacing scale (4-pt base)
+    static let space1: CGFloat = 4
+    static let space2: CGFloat = 8
+    static let space3: CGFloat = 12
+    static let space4: CGFloat = 16
+    static let space5: CGFloat = 24
+    static let space6: CGFloat = 32
+
+    // Corner radii
+    static let radiusSmall: CGFloat = 6
+    static let radiusMedium: CGFloat = 10
+    static let radiusLarge: CGFloat = 16
+
+    // Reader layout
+    static let readingNarrow: CGFloat = 720
+    static let readingWide: CGFloat = 940
+    static let readerHPadding: CGFloat = 36
+    static let readerVPadding: CGFloat = 28
+    static let blockSpacing: CGFloat = 16
+}
+
+enum Typography {
+    static let body = SwiftUI.Font.system(size: 15)
+    static let bodyLineSpacing: CGFloat = 6
+    static let mono = SwiftUI.Font.system(size: 12.5, design: .monospaced)
+    static let caption = SwiftUI.Font.system(size: 12)
+
+    static func heading(_ level: Int) -> SwiftUI.Font {
+        switch level {
+        case 1: return .system(size: 28, weight: .bold)
+        case 2: return .system(size: 22, weight: .bold)
+        case 3: return .system(size: 18, weight: .semibold)
+        case 4: return .system(size: 15.5, weight: .semibold)
+        default: return .system(size: 13.5, weight: .semibold)
+        }
+    }
+}
+
 private struct AppThemeKey: EnvironmentKey {
     static let defaultValue = AppTheme.dark
 }

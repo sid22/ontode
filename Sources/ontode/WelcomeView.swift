@@ -5,23 +5,31 @@ struct WelcomeView: View {
 
     var body: some View {
         VStack(spacing: 20) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color(red: 0.36, green: 0.28, blue: 0.72),
-                                Color(red: 0.18, green: 0.13, blue: 0.40),
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .frame(width: 84, height: 84)
+            if let icon = AppIcon.bundledImage {
+                Image(nsImage: icon)
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: 96, height: 96)
                     .shadow(color: .black.opacity(0.25), radius: 8, y: 4)
-                Text("md")
-                    .font(.system(size: 32, weight: .bold, design: .monospaced))
-                    .foregroundStyle(.white)
+            } else {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 0.36, green: 0.28, blue: 0.72),
+                                    Color(red: 0.18, green: 0.13, blue: 0.40),
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .frame(width: 84, height: 84)
+                        .shadow(color: .black.opacity(0.25), radius: 8, y: 4)
+                    Text("md")
+                        .font(.system(size: 32, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.white)
+                }
             }
             VStack(spacing: 6) {
                 Text("No Folders Open")

@@ -7,7 +7,7 @@ struct MarkdownView: View {
     @Environment(\.appTheme) private var theme
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: Metrics.blockSpacing) {
             if appState.blocks.isEmpty {
                 if appState.editingBlockID == AppState.wholeFileEditID {
                     BlockEditor()
@@ -49,6 +49,8 @@ struct EditableBlockView: View {
                 )
                 .contentShape(Rectangle())
                 .onHover { hovering = $0 }
+                .animation(.easeOut(duration: 0.12), value: hovering)
+                .animation(.easeInOut(duration: 0.12), value: appState.focusedBlockID)
                 .onTapGesture(count: 2) {
                     if appState.editingBlockID == nil {
                         appState.focusedBlockID = block.id
@@ -130,7 +132,7 @@ struct MDBlockView: View {
         case .heading(let level, let text):
             VStack(alignment: .leading, spacing: 7) {
                 SwiftUI.Text(text)
-                    .font(Self.headingFont(level))
+                    .font(Typography.heading(level))
                     .foregroundStyle(theme.emphasis)
                 if level <= 2 {
                     Rectangle()
@@ -141,8 +143,8 @@ struct MDBlockView: View {
             .padding(.top, level <= 2 ? 10 : 6)
         case .paragraph(let text):
             SwiftUI.Text(text)
-                .font(.system(size: 14))
-                .lineSpacing(4)
+                .font(Typography.body)
+                .lineSpacing(Typography.bodyLineSpacing)
         case .code(let language, let code):
             CodeBlockView(language: language, code: code)
         case .quote(let blocks):
@@ -176,11 +178,11 @@ struct MDBlockView: View {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     if let checked = item.checkbox {
                         Image(systemName: checked ? "checkmark.square.fill" : "square")
-                            .font(.system(size: 13))
+                            .font(.system(size: 14))
                             .foregroundStyle(checked ? theme.accent : theme.secondary)
                     } else {
                         SwiftUI.Text(marker(index))
-                            .font(.system(size: 14))
+                            .font(Typography.body)
                             .monospacedDigit()
                             .foregroundStyle(theme.secondary)
                             .frame(minWidth: 16, alignment: .trailing)
@@ -192,16 +194,6 @@ struct MDBlockView: View {
             }
         }
         .padding(.leading, 2)
-    }
-
-    private static func headingFont(_ level: Int) -> SwiftUI.Font {
-        switch level {
-        case 1: return .system(size: 27, weight: .bold)
-        case 2: return .system(size: 21, weight: .bold)
-        case 3: return .system(size: 17, weight: .semibold)
-        case 4: return .system(size: 15, weight: .semibold)
-        default: return .system(size: 13, weight: .semibold)
-        }
     }
 }
 
@@ -252,10 +244,14 @@ struct CodeBlockView: View {
         VStack(alignment: .leading, spacing: 0) {
             if let language, !language.isEmpty {
                 SwiftUI.Text(language)
-                    .font(.caption2.weight(.medium))
+                    .font(.caption2.weight(.semibold))
+                    .textCase(.uppercase)
                     .foregroundStyle(theme.secondary)
                     .padding(.horizontal, 12)
-                    .padding(.top, 8)
+                    .padding(.vertical, 7)
+                Rectangle()
+                    .fill(theme.border)
+                    .frame(height: 1)
             }
             ScrollView(.horizontal) {
                 SwiftUI.Text(highlightedCode)
@@ -265,7 +261,11 @@ struct CodeBlockView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(theme.raised)
-        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Metrics.radiusSmall, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Metrics.radiusSmall, style: .continuous)
+                .stroke(theme.border, lineWidth: 1)
+        )
         .overlay(alignment: .topTrailing) {
             if hovering {
                 Button {

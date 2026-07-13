@@ -21,9 +21,13 @@ final class AppState: ObservableObject {
     @Published var theme: AppTheme {
         didSet { UserDefaults.standard.set(theme.rawValue, forKey: Self.themeKey) }
     }
+    @Published var wideReading: Bool {
+        didSet { UserDefaults.standard.set(wideReading, forKey: Self.wideReadingKey) }
+    }
 
     static let wholeFileEditID = UUID()
     private static let themeKey = "ontode.theme"
+    private static let wideReadingKey = "ontode.wideReading"
     private static let foldersKey = "ontode.folders"
     private static let tabsKey = "ontode.openTabs"
     private static let selectionKey = "ontode.selectedFile"
@@ -38,6 +42,7 @@ final class AppState: ObservableObject {
     init() {
         let stored = UserDefaults.standard.string(forKey: Self.themeKey) ?? ""
         theme = stored.lowercased().contains("light") ? .light : .dark
+        wideReading = UserDefaults.standard.bool(forKey: Self.wideReadingKey)
         restoreSession()
     }
 
@@ -51,6 +56,10 @@ final class AppState: ObservableObject {
 
     func toggleTheme() {
         theme = theme == .dark ? .light : .dark
+    }
+
+    func toggleReadingWidth() {
+        wideReading.toggle()
     }
 
     func toggleSource() {

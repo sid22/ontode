@@ -5,11 +5,13 @@ enum AppIcon {
         NSApplication.shared.applicationIconImage = image
     }
 
+    static var bundledImage: NSImage? {
+        guard let url = iconURL else { return nil }
+        return NSImage(contentsOf: url)
+    }
+
     private static var image: NSImage {
-        if let url = iconURL, let icon = NSImage(contentsOf: url) {
-            return icon
-        }
-        return fallbackImage
+        bundledImage ?? fallbackImage
     }
 
     private static var iconURL: URL? {
