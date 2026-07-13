@@ -26,16 +26,22 @@ struct FileReaderView: View {
 
     @ViewBuilder
     private func readerContent(for file: URL) -> some View {
-        Group {
-            if appState.showSource {
-                sourceView
-            } else {
-                renderedView
+        GeometryReader { proxy in
+            VStack(spacing: 0) {
+                Group {
+                    if appState.showSource {
+                        sourceView
+                    } else {
+                        renderedView
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .overlay(alignment: .bottomTrailing) { wordCountBadge }
+                BacklinksPanel(maxContentHeight: proxy.size.height * 0.4)
             }
         }
         .id(file)
         .navigationTitle(file.lastPathComponent)
-        .overlay(alignment: .bottomTrailing) { wordCountBadge }
         .environment(\.openURL, OpenURLAction { url in
             if url.scheme == "ontode-wiki" {
                 let raw = String(url.absoluteString.dropFirst("ontode-wiki:".count))
@@ -54,6 +60,7 @@ struct FileReaderView: View {
     private var renderedView: some View {
         VStack(spacing: 0) {
             breadcrumbBar
+            PropertiesStrip()
             ScrollViewReader { proxy in
                 ScrollView(.vertical) {
                     MarkdownView()

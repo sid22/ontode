@@ -27,7 +27,15 @@ docs.
   indexed in the background so big folders never block the UI
 - **Live updates** — FSEvents watcher rescans the folder and re-renders the open file
   when anything changes
-- **Wikilinks** — `[[note]]` and `[[note|label]]` resolve to files in the open folder
+- **Wikilinks** — `[[note]]` and `[[note|label]]` resolve to files in the open folder,
+  including by frontmatter `title:` and `aliases:`
+- **Backlinks** — a collapsible panel under the reader lists every note linking to the
+  current one (with context), plus unlinked mentions of its title or aliases
+- **Tags & properties** — YAML frontmatter renders as a properties strip with clickable
+  tag chips; inline `#tags` and frontmatter `tags:` fill a Tags section in the sidebar
+  that filters the file list
+- **Saved queries** — save a tag filter as a named query (`#tag` and `key:value` terms,
+  AND-combined) that lives in the sidebar as a virtual folder
 - **Quick open** — ⌘P fuzzy file switcher
 - **In-place editing** — Obsidian-style: click a block to place the cursor, press Return
   or double-click to reveal its raw Markdown and edit it right there; Esc, ⌘⏎, or

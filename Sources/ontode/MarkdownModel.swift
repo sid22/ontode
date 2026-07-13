@@ -32,7 +32,7 @@ struct MDListItem: Identifiable {
 
 enum MarkdownBuilder {
     static func blocks(from source: String) -> [MDBlock] {
-        Document(parsing: source).children.compactMap(block(from:))
+        Document(parsing: Frontmatter.displaySource(source)).children.compactMap(block(from:))
     }
 
     private static func block(from markup: Markup) -> MDBlock? {

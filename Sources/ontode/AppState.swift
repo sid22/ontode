@@ -10,6 +10,16 @@ final class AppState: ObservableObject {
     @Published var fileContent: String = ""
     @Published var blocks: [MDBlock] = []
     @Published var searchResults: [SearchResult] = []
+    @Published private(set) var noteIndex = NoteIndexSnapshot.empty
+    @Published var tagFilter: String? {
+        didSet { if tagFilter != nil { activeSavedQuery = nil } }
+    }
+    @Published var activeSavedQuery: SavedQuery? {
+        didSet { if activeSavedQuery != nil { tagFilter = nil } }
+    }
+    @Published var savedQueries: [SavedQuery] = [] {
+        didSet { persistSavedQueries() }
+    }
     @Published var quickOpenPresented = false
     @Published var showSource = false
     @Published var focusedBlockID: UUID?
@@ -31,6 +41,7 @@ final class AppState: ObservableObject {
     private static let foldersKey = "ontode.folders"
     private static let tabsKey = "ontode.openTabs"
     private static let selectionKey = "ontode.selectedFile"
+    private static let savedQueriesKey = "ontode.savedQueries"
 
     private let searchIndex: SearchIndex = FTS5SearchIndex()
     private var watchers: [URL: FolderWatcher] = [:]
@@ -38,11 +49,17 @@ final class AppState: ObservableObject {
     private var scanGeneration = 0
     private var scanTask: Task<Void, Never>?
     private var debounceTask: Task<Void, Never>?
+    private var noteIndexGeneration = 0
+    private var noteIndexTask: Task<Void, Never>?
 
     init() {
         let stored = UserDefaults.standard.string(forKey: Self.themeKey) ?? ""
         theme = stored.lowercased().contains("light") ? .light : .dark
         wideReading = UserDefaults.standard.bool(forKey: Self.wideReadingKey)
+        if let data = UserDefaults.standard.data(forKey: Self.savedQueriesKey),
+           let stored = try? JSONDecoder().decode([SavedQuery].self, from: data) {
+            savedQueries = stored
+        }
         restoreSession()
     }
 
@@ -232,6 +249,10 @@ final class AppState: ObservableObject {
     func openWikilink(_ target: String) {
         let wanted = target.lowercased()
         guard !wanted.isEmpty else { return }
+        if let resolved = noteIndex.resolution[wanted] {
+            selectFile(resolved)
+            return
+        }
         let match = mdFiles.first { url in
             let relative = relativePath(for: url).lowercased()
             let relativeNoExtension = (relative as NSString).deletingPathExtension
@@ -334,6 +355,59 @@ final class AppState: ObservableObject {
         }
         reindexSearch()
         runSearch()
+        rebuildNoteIndex()
+    }
+
+    var hasSidebarFilter: Bool {
+        tagFilter != nil || activeSavedQuery != nil
+    }
+
+    var filteredFiles: [URL] {
+        if let tagFilter {
+            return notes(matchingQuery: "#" + tagFilter)
+        }
+        if let activeSavedQuery {
+            return notes(matchingQuery: activeSavedQuery.query)
+        }
+        return []
+    }
+
+    func clearSidebarFilter() {
+        tagFilter = nil
+        activeSavedQuery = nil
+    }
+
+    func notes(matchingQuery query: String) -> [URL] {
+        let terms = query.split(whereSeparator: \.isWhitespace).map(String.init)
+        guard !terms.isEmpty else { return [] }
+        return mdFiles.filter { url in
+            guard let meta = noteIndex.byURL[url] else { return false }
+            return terms.allSatisfy { term in
+                if term.hasPrefix("#") {
+                    return meta.tags.contains(term.dropFirst().lowercased())
+                }
+                guard let colon = term.firstIndex(of: ":") else { return false }
+                let key = String(term[..<colon]).lowercased()
+                let value = String(term[term.index(after: colon)...]).lowercased()
+                guard !key.isEmpty, !value.isEmpty else { return false }
+                return meta.properties.contains {
+                    $0.key.lowercased() == key && $0.value.lowercased() == value
+                }
+            }
+        }
+    }
+
+    func saveCurrentFilter(named name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespaces)
+        guard let tagFilter, !trimmed.isEmpty else { return }
+        savedQueries.append(SavedQuery(name: trimmed, query: "#" + tagFilter))
+    }
+
+    func deleteSavedQuery(_ query: SavedQuery) {
+        savedQueries.removeAll { $0.id == query.id }
+        if activeSavedQuery?.id == query.id {
+            activeSavedQuery = nil
+        }
     }
 
     func quickOpenMatches(for query: String) -> [URL] {
@@ -457,6 +531,29 @@ final class AppState: ObservableObject {
 
         reindexSearch()
         runSearch()
+        rebuildNoteIndex()
+    }
+
+    private func rebuildNoteIndex() {
+        noteIndexGeneration += 1
+        let generation = noteIndexGeneration
+        let files = mdFiles
+        let roots = workspaceFolders.map(\.url)
+        let previous = noteIndex
+        noteIndexTask?.cancel()
+        noteIndexTask = Task.detached(priority: .utility) { [weak self] in
+            let snapshot = NoteIndexBuilder.build(files: files, roots: roots, previous: previous)
+            guard !Task.isCancelled, let self else { return }
+            await MainActor.run {
+                guard generation == self.noteIndexGeneration else { return }
+                self.noteIndex = snapshot
+            }
+        }
+    }
+
+    private func persistSavedQueries() {
+        guard let data = try? JSONEncoder().encode(savedQueries) else { return }
+        UserDefaults.standard.set(data, forKey: Self.savedQueriesKey)
     }
 
     private func reindexSearch() {
