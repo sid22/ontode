@@ -28,7 +28,7 @@ jobs:
           security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" -P "$MACOS_CERT_PASSWORD" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KPW" "$KEYCHAIN" >/dev/null
           security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
-          SIGN_ID="$(security find-identity -v -p codesigning "$KEYCHAIN" | awk 'NR==1{print $2}')"
+          SIGN_ID="$(security find-identity -v -p codesigning "$KEYCHAIN" | awk '/[0-9A-Fa-f]{40}/{print $2; exit}')"
           echo "Signing identity: $SIGN_ID"
 
           BIN_PATH=$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)
