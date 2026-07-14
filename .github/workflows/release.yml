@@ -24,7 +24,24 @@ jobs:
         run: swift build -c release --arch arm64 --arch x86_64
 
       - name: Assemble ontode.app
+        env:
+          MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
         run: |
+          # Import the self-signed code-signing certificate into a temporary keychain.
+          # A stable identity (vs. throwaway ad-hoc) is required for Sparkle to accept updates.
+          KEYCHAIN="$RUNNER_TEMP/ontode-signing.keychain-db"
+          KPW="$(openssl rand -base64 24)"
+          security create-keychain -p "$KPW" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KPW" "$KEYCHAIN"
+          echo "$MACOS_CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" -P "$MACOS_CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KPW" "$KEYCHAIN" >/dev/null
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          SIGN_ID="$(security find-identity -v -p codesigning "$KEYCHAIN" | awk 'NR==1{print $2}')"
+          echo "Signing identity: $SIGN_ID"
+
           BIN_PATH=$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)
           APP=build/ontode.app
           mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
@@ -99,7 +116,8 @@ jobs:
           </dict>
           </plist>
           PLIST
-          codesign --force --deep --sign - "$APP"
+          codesign --force --deep --sign "$SIGN_ID" --keychain "$KEYCHAIN" "$APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
 
       - name: Create DMG
         run: |
